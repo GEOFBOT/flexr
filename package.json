@@ -1,0 +1,18 @@
+{
+  "name": "flexr",
+  "version": "0.1.0",
+  "description": "Facebook Messenger log exporter",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Geoffrey Mon",
+  "license": "MIT",
+  "dependencies": {
+    "async": "^2.2.0",
+    "facebook-chat-api": "^1.3.0",
+    "mkdirp": "^0.5.1",
+    "npmlog": "^4.0.2",
+    "yargs": "^7.0.2"
+  }
+}
