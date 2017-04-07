@@ -49,13 +49,13 @@ const argv = require('yargs')
 
 const id = argv.target;
 const interval = argv.interval;
+log.info("Using interval of " + interval);
 
-function getHistory(api, id, start, limit, timestamp, callback) {
-    api.getThreadHistory(id, start, start + limit, timestamp, callback);
+function getHistory(api, id, limit, timestamp, callback) {
+    api.getThreadHistory(id, limit, timestamp, callback);
 }
 
 function getAndStoreHistory(api, conversationID) {
-    let offset = 0;
     let i = 0;
     let total = 0;
     let lastId = '';
@@ -64,7 +64,7 @@ function getAndStoreHistory(api, conversationID) {
     async.whilst(
         () => { return running; },
         (callback) => {
-            getHistory(api, conversationID, offset, interval, lastTimestamp, (error, history) => {
+            getHistory(api, conversationID, interval, lastTimestamp, (error, history) => {
                 if (error) {
                     running = false;
                     callback(error);
@@ -79,23 +79,21 @@ function getAndStoreHistory(api, conversationID) {
                 // so we cut off the last message (which we already have). However, if we have less than the
                 // interval number of messages, then we shouldn't cut off the last one. This handles this logic for us.
                 let truncatedHistory = history; // TODO: fix this messy stopgap logic
-                if (offset > 0) {
+                if (lastTimestamp) {
                     truncatedHistory = history.slice(0, interval);
                 }
-                if (offset > 0 && truncatedHistory.length < interval) {
+                if (lastTimestamp && truncatedHistory.length < interval) {
                     // Remove the last element if we have obtained less than we expected
                     truncatedHistory = truncatedHistory.slice(0, truncatedHistory.length - 1);
                 }
 
-                if (truncatedHistory.length <= 0 || lastId == truncatedHistory[0].messageID) {
+                if (truncatedHistory.length <= 0 || lastId === truncatedHistory[0].messageID) {
                     running = false;
                     log.info('Seems like we have reached the top of the message history; exiting');
                     callback();
                     return;
                 }
 
-
-                offset += truncatedHistory.length;
                 lastTimestamp = truncatedHistory[0].timestamp;
                 lastId = truncatedHistory[0].messageID;
                 total += truncatedHistory.length;
@@ -110,7 +108,7 @@ function getAndStoreHistory(api, conversationID) {
                         fs.writeFile(path.join(outputDirectory, i.toString() + '.json'), JSON.stringify(truncatedHistory), {}, (err) => {
                             if (err) log.error(err);
 
-                            log.verbose('Got ' + truncatedHistory.length + ' messages; running total: ' + total);
+                            log.info('Got ' + truncatedHistory.length + ' messages; running total: ' + total);
                             i++;
                             callback(null);
                         });
