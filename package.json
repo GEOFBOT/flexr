@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "async": "^2.2.0",
+    "download": "^5.0.3",
     "facebook-chat-api": "git://github.com/GEOFBOT/facebook-chat-api.git#55e0347",
+    "file-type": "^4.2.0",
     "mkdirp": "^0.5.1",
     "npmlog": "^4.0.2",
     "readline-sync": "^1.4.7",

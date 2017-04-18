@@ -5,6 +5,8 @@ const mkdirp = require('mkdirp');
 const login = require('facebook-chat-api');
 const async = require('async');
 const log = require("npmlog");
+const download = require('download');
+const fileType = require("file-type");
 
 // Grabbing 25k messages at a time seems to be stable enough.
 // If the script crashes with 500 errors or with Facebook complaining you can
@@ -51,10 +53,6 @@ const id = argv.target;
 const interval = argv.interval;
 log.info("Using interval of " + interval);
 
-function getHistory(api, id, limit, timestamp, callback) {
-    api.getThreadHistory(id, limit, timestamp, callback);
-}
-
 function getAndStoreHistory(api, conversationID) {
     let i = 0;
     let total = 0;
@@ -62,9 +60,11 @@ function getAndStoreHistory(api, conversationID) {
     let running = true;
     let lastTimestamp = null;
     async.whilst(
-        () => { return running; },
+        () => {
+            return running;
+        },
         (callback) => {
-            getHistory(api, conversationID, interval, lastTimestamp, (error, history) => {
+            api.getThreadHistory(conversationID, interval, lastTimestamp, (error, history) => {
                 if (error) {
                     running = false;
                     callback(error);
@@ -74,7 +74,6 @@ function getAndStoreHistory(api, conversationID) {
                     callback('No messages returned from Messenger; something is amiss!');
                     return;
                 }
-
                 // messenger returns interval+1 messages if there are more total messages than the interval,
                 // so we cut off the last message (which we already have). However, if we have less than the
                 // interval number of messages, then we shouldn't cut off the last one. This handles this logic for us.
@@ -86,18 +85,87 @@ function getAndStoreHistory(api, conversationID) {
                     // Remove the last element if we have obtained less than we expected
                     truncatedHistory = truncatedHistory.slice(0, truncatedHistory.length - 1);
                 }
-
                 if (truncatedHistory.length <= 0 || lastId === truncatedHistory[0].messageID) {
                     running = false;
                     log.info('Seems like we have reached the top of the message history; exiting');
                     callback();
                     return;
                 }
-
                 lastTimestamp = truncatedHistory[0].timestamp;
                 lastId = truncatedHistory[0].messageID;
                 total += truncatedHistory.length;
-
+                // Download attachments
+                mkdirp(attachDirectory, (err) => {
+                    if (err) {
+                        log.error('Something went wrong trying to create the directory to download attachments.');
+                        log.error(err);
+                    } else {
+                        async.map(
+                            truncatedHistory,
+                            (message) => {
+                                if (message.attachments.length > 0) {
+                                    async.map(
+                                        message.attachments,
+                                        (attachment) => {
+                                            log.info('Downloading attachment');
+                                            async.waterfall([
+                                                (callback) => {
+                                                    switch (attachment.type) {
+                                                        case 'animated_image':
+                                                            let id = attachment.name.split('-')[1];
+                                                            api.resolvePhotoUrl(id, (err, u) => {
+                                                                callback(null, 'gif-' + id, u)
+                                                            });
+                                                            break;
+                                                        case 'photo':
+                                                            api.resolvePhotoUrl(attachment.ID, (err, u) => {
+                                                                callback(null, 'photo-' + attachment.ID, u)
+                                                            });
+                                                            break;
+                                                        case 'sticker':
+                                                            callback(null, 'sticker-' + attachment.stickerID, attachment.url);
+                                                            break;
+                                                        case 'share':
+                                                            if (attachment.image === null) {
+                                                                callback(null, null, null);
+                                                            } else {
+                                                                callback(null, 'share-' + attachment.ID, attachment.image);
+                                                            }
+                                                            break;
+                                                        case 'error':
+                                                            callback();
+                                                            break;
+                                                        default:
+                                                            callback(null, attachment.name, attachment.url);
+                                                    }
+                                                },
+                                                (name, u, callback) => {
+                                                    if (attachment.type === 'error' || (u === null && attachment.type === 'share')) {
+                                                        log.info('This attachment was a "share" and had no image; continuing...')
+                                                    } else {
+                                                        download(u).then(data => {
+                                                            name += '.' + fileType(data).ext;
+                                                            fs.writeFile(path.join(attachDirectory, name), data, () => {
+                                                                callback(null, name, u);
+                                                            });
+                                                        });
+                                                    }
+                                                }
+                                            ], (err, name, u) => {
+                                                if (err) {
+                                                    log.error('Error downloading attachment at ' + u);
+                                                    log.error(err);
+                                                } else {
+                                                    log.info('Attachment downloaded to ' + name);
+                                                }
+                                            });
+                                        }
+                                    )
+                                }
+                            }
+                        );
+                    }
+                });
                 mkdirp(outputDirectory, (err) => {
                     if (err) {
                         log.error('Something went wrong trying to create the directory to log the messages.');
@@ -107,14 +175,13 @@ function getAndStoreHistory(api, conversationID) {
                         // actually contain older messages. When using these files chronologically, remember to use the largest numbered files first.
                         fs.writeFile(path.join(outputDirectory, i.toString() + '.json'), JSON.stringify(truncatedHistory), {}, (err) => {
                             if (err) log.error(err);
-
                             log.info('Got ' + truncatedHistory.length + ' messages; running total: ' + total);
                             i++;
                             callback(null);
                         });
                     }
                 });
-            } );
+            });
         },
         (err) => {
             if (err) log.error(err);
@@ -125,6 +192,7 @@ function getAndStoreHistory(api, conversationID) {
 }
 
 const outputDirectory = path.join('./output', id.toString());
+const attachDirectory = path.join(outputDirectory, 'attachments');
 fs.readFile('appstate.json', 'utf8', {}, (error, appState) => {
     if (error) {
         log.error(error);
