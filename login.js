@@ -22,7 +22,8 @@ login({email: email, password: pw}, {forceLogin: true}, (err, api) => {
             log.error('Error while saving authentication file!');
             log.error(error);
         } else {
-            log.info('Login details saved.');
+            log.info('Login details saved to appstate.json.');
+            log.info('When you are done using this tool, please delete appstate.json.');
         }
     });
 });
