@@ -10,14 +10,21 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/GEOFBOT/flexr.git"
+    "url": "git://giokthub.com/GEOFBOT/flexr.git"
   },
   "dependencies": {
     "async": "^2.2.0",
+    "autolinker": "^1.4.3",
     "download": "^5.0.3",
+    "escape-html": "^1.0.3",
     "facebook-chat-api": "git://github.com/GEOFBOT/facebook-chat-api.git#55e0347",
     "file-type": "^4.2.0",
+    "glob": "^7.1.1",
+    "html-to-pdf": "GEOFBOT/html-to-pdf",
+    "htmltidy2": "^0.2.1",
     "mkdirp": "^0.5.1",
+    "moment": "^2.18.1",
+    "moment-timezone": "^0.5.13",
     "npmlog": "^4.0.2",
     "readline-sync": "^1.4.7",
     "yargs": "^7.0.2"

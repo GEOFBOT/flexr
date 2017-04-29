@@ -1,0 +1,34 @@
+body {
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+p.line {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+}
+
+span.timestamp {
+    color: gray;
+}
+
+span.sender, span.message.event {
+    color: blue;
+}
+
+span.content.emoji-medium {
+    font-size: 1.25em;
+}
+
+span.content.emoji-large {
+    font-size: 2em;
+}
+
+div.attachment.photo, div.attachment.sticker div.attachment.share {
+    max-width: 50em;
+    max-height: 60em;
+}
+
+div img {
+    max-width: inherit;
+    max-height: inherit;
+}

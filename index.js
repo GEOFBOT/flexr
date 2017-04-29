@@ -4,14 +4,14 @@ const path = require('path');
 const mkdirp = require('mkdirp');
 const login = require('facebook-chat-api');
 const async = require('async');
-const log = require("npmlog");
+const log = require('npmlog');
 const download = require('download');
 const fileType = require("file-type");
 
-// Grabbing 25k messages at a time seems to be stable enough.
+// Grabbing 5k messages at a time seems to be stable enough.
 // If the script crashes with 500 errors or with Facebook complaining you can
 // try lowering this number.
-const defaultInterval = 25000;
+const defaultInterval = 5000;
 const argv = require('yargs')
     .options({
         // TODO: Add fancy login logic instead of using another script (login.js)
@@ -94,93 +94,116 @@ function getAndStoreHistory(api, conversationID) {
                 lastTimestamp = truncatedHistory[0].timestamp;
                 lastId = truncatedHistory[0].messageID;
                 total += truncatedHistory.length;
-                // Download attachments
-                mkdirp(attachDirectory, (err) => {
-                    if (err) {
-                        log.error('Something went wrong trying to create the directory to download attachments.');
-                        log.error(err);
-                    } else {
+
+                // Resolve attachment URLs and download attachments
+                async.waterfall([
+                    (wCallback) => {
                         async.map(
                             truncatedHistory,
-                            (message) => {
-                                if (message.attachments.length > 0) {
-                                    async.map(
-                                        message.attachments,
-                                        (attachment) => {
-                                            log.info('Downloading attachment');
-                                            async.waterfall([
-                                                (callback) => {
-                                                    switch (attachment.type) {
-                                                        case 'animated_image':
-                                                            let id = attachment.name.split('-')[1];
-                                                            api.resolvePhotoUrl(id, (err, u) => {
-                                                                callback(null, 'gif-' + id, u)
-                                                            });
-                                                            break;
-                                                        case 'photo':
-                                                            api.resolvePhotoUrl(attachment.ID, (err, u) => {
-                                                                callback(null, 'photo-' + attachment.ID, u)
-                                                            });
-                                                            break;
-                                                        case 'sticker':
-                                                            callback(null, 'sticker-' + attachment.stickerID, attachment.url);
-                                                            break;
-                                                        case 'share':
-                                                            if (attachment.image === null) {
-                                                                callback(null, null, null);
-                                                            } else {
-                                                                callback(null, 'share-' + attachment.ID, attachment.image);
-                                                            }
-                                                            break;
-                                                        case 'error':
-                                                            callback();
-                                                            break;
-                                                        default:
-                                                            callback(null, attachment.name, attachment.url);
-                                                    }
-                                                },
-                                                (name, u, callback) => {
-                                                    if (attachment.type === 'error' || (u === null && attachment.type === 'share')) {
-                                                        log.info('This attachment was a "share" and had no image; continuing...')
-                                                    } else {
-                                                        download(u).then(data => {
-                                                            name += '.' + fileType(data).ext;
-                                                            fs.writeFile(path.join(attachDirectory, name), data, () => {
-                                                                callback(null, name, u);
-                                                            });
+                            (message, outerOuterCb) => {
+                                async.map(
+                                    message.attachments,
+                                    (attachment, outerCb) => {
+                                        async.waterfall([
+                                            (callback) => {
+                                                switch (attachment.type) {
+                                                    case 'animated_image':
+                                                        let id = attachment.name.split('-')[1];
+                                                        api.resolvePhotoUrl(id, (err, u) => {
+                                                            callback(null, 'gif-' + id, u)
                                                         });
-                                                    }
+                                                        break;
+                                                    case 'photo':
+                                                        api.resolvePhotoUrl(attachment.ID, (err, u) => {
+                                                            callback(null, 'photo-' + attachment.ID, u)
+                                                        });
+                                                        break;
+                                                    case 'sticker':
+                                                        callback(null, 'sticker-' + attachment.stickerID, attachment.url);
+                                                        break;
+                                                    case 'share':
+                                                        if (attachment.image === null) {
+                                                            callback(null, null, null);
+                                                        } else {
+                                                            callback(null, 'share-' + attachment.ID, attachment.image);
+                                                        }
+                                                        break;
+                                                    case 'error':
+                                                        callback();
+                                                        break;
+                                                    case 'video':
+                                                        callback(null, attachment.filename, attachment.url);
+                                                        break;
+                                                    default:
+                                                        callback(null, attachment.name, attachment.url);
                                                 }
-                                            ], (err, name, u) => {
-                                                if (err) {
-                                                    log.error('Error downloading attachment at ' + u);
-                                                    log.error(err);
-                                                } else {
-                                                    log.info('Attachment downloaded to ' + name);
-                                                }
-                                            });
-                                        }
-                                    )
-                                }
+                                            },
+                                            (name, url) => {
+                                                attachment.fileName = name;
+                                                attachment.fileUrl = url;
+                                                outerCb();
+                                            }
+                                        ]);
+                                    },
+                                    (err) => {
+                                        outerOuterCb();
+                                    }
+                                )
+                            },
+                            (err) => {
+                                wCallback();
                             }
                         );
-                    }
-                });
-                mkdirp(outputDirectory, (err) => {
-                    if (err) {
-                        log.error('Something went wrong trying to create the directory to log the messages.');
-                        log.error(err);
-                    } else {
-                        // Because Messenger gives us messages that are newest first, the JSON output files with larger number filenames
-                        // actually contain older messages. When using these files chronologically, remember to use the largest numbered files first.
-                        fs.writeFile(path.join(outputDirectory, i.toString() + '.json'), JSON.stringify(truncatedHistory), {}, (err) => {
-                            if (err) log.error(err);
-                            log.info('Got ' + truncatedHistory.length + ' messages; running total: ' + total);
-                            i++;
-                            callback(null);
+                    },
+                    () => {
+                        mkdirp(outputDirectory, (err) => {
+                            if (err) {
+                                log.error('Something went wrong trying to create the directory to log the messages.');
+                                log.error(err);
+                            } else {
+                                // Because Messenger gives us messages that are newest first, the JSON output files with larger number filenames
+                                // actually contain older messages. When using these files chronologically, remember to use the largest numbered files first.
+                                fs.writeFile(path.join(outputDirectory, i.toString() + '.json'), JSON.stringify(truncatedHistory), {}, (err) => {
+                                    if (err) log.error(err);
+                                    log.info('Got ' + truncatedHistory.length + ' messages; running total: ' + total);
+                                    i++;
+                                    callback(null);
+                                });
+                            }
+                        });
+
+                        // Download attachments
+                        mkdirp(attachDirectory, (err) => {
+                            if (err) {
+                                log.error('Something went wrong trying to create the directory to download attachments.');
+                                log.error(err);
+                            } else {
+                                log.verbose('Downloading attachment');
+                                for (let mIdx = 0; mIdx < truncatedHistory.length; mIdx++) {
+                                    for (let aIdx = 0; aIdx < truncatedHistory[mIdx].attachments.length; aIdx++) {
+                                        let attachment = truncatedHistory[mIdx].attachments[aIdx];
+                                        let name = attachment.fileName;
+                                        let u = attachment.fileUrl;
+                                        if (attachment.type === 'error' || (u === null && attachment.type === 'share')) {
+                                            log.verbose('This attachment was a "share" and had no image; continuing...')
+                                        } else {
+                                            let destination = path.join(attachDirectory, name);
+
+                                            download(u).then(data => {
+                                                let ft = fileType(data);
+                                                if (ft && ft.ext) destination += '.' + ft.ext;
+
+                                                fs.writeFile(destination, data, () => {
+                                                    log.verbose('Attachment downloaded to ' + destination);
+                                                });
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         });
                     }
-                });
+                ]);
             });
         },
         (err) => {
