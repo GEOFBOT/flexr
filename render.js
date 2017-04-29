@@ -114,14 +114,17 @@ glob(path.join(logPath, '*.json'), function (error, rawFiles) {
                                 }
                             }
 
-                            outputStream.write(util.format(
-                                lineHtml,
-                                escape(mt.tz(moment.tz.guess()).format('llll z')),
-                                escape(message.senderName),
-                                moreClasses,
-                                autolinker.link(escape(message.body)),
-                                attachmentDivs
-                            ));
+                            let splitM = message.body.split('\n');
+                            for (let m in splitM) {
+                                outputStream.write(util.format(
+                                    lineHtml,
+                                    escape(mt.tz(moment.tz.guess()).format('llll z')),
+                                    escape(message.senderName),
+                                    moreClasses,
+                                    autolinker.link(escape(splitM[m])),
+                                    attachmentDivs
+                                ));
+                            }
                             break;
                         case 'event':
                             outputStream.write(util.format(
