@@ -61,7 +61,7 @@ glob(path.join(logPath, '*.json'), function (error, rawFiles) {
         },
         (files, callback) => {
             // Larger numbered files come first
-            files.sort((a, b) => {return a - b;}).reverse();
+            files.sort((a, b) => {return b - a;});
             for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
                 let filePath = path.join(logPath, '' + files[fileIndex] + '.json');
                 let messages = JSON.parse(fs.readFileSync(filePath, 'utf8'));
