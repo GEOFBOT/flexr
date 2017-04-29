@@ -1,7 +1,6 @@
 # Flexr: **F**acebook Messenger **L**og **Ex**porte**r**
 
-Logs Facebook Messenger chat logs to json files
-(which I will figure out how to process into some nice-looking HTML/PDFs etc.)
+Logs Facebook Messenger chat logs to json files, which can be rendered to a readable HTML.
 
 ## Usage
 1. Install all the dependencies with `npm install`.
