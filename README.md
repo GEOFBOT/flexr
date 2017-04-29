@@ -2,6 +2,8 @@
 
 Logs Facebook Messenger chat logs to json files, which can be rendered to a readable HTML.
 
+![Sample screenshot](https://cloud.githubusercontent.com/assets/5053772/25557407/87840b04-2cde-11e7-9110-8d4a41216e4a.png)
+
 ## Usage
 1. Install all the dependencies with `npm install`.
 
