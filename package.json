@@ -17,7 +17,7 @@
     "autolinker": "^1.4.3",
     "download": "^5.0.3",
     "escape-html": "^1.0.3",
-    "facebook-chat-api": "git://github.com/GEOFBOT/facebook-chat-api.git#55e0347",
+    "facebook-chat-api": "^1.4.0",
     "file-type": "^4.2.0",
     "glob": "^7.1.1",
     "html-to-pdf": "GEOFBOT/html-to-pdf",
